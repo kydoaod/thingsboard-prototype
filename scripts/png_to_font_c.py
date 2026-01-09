@@ -8,33 +8,35 @@ def load_glyph(path, width, height, pad=0, shrink_border=0, vert_scale=1.0, thre
     img = Image.open(path).convert("RGBA")
     alpha = img.split()[-1]
     
-    # BMP logic: i-invert ang black text para maging mask
     if alpha.getextrema() == (255, 255):
         alpha = img.convert("L").point(lambda p: 255 - p)
 
     bbox = alpha.getbbox()
     glyph = alpha.crop(bbox) if bbox else alpha
     
-    # Scaling (siguraduhing hindi ma-distort ang '4')
     max_w, max_h = width - (pad * 2), height - 4
     gw, gh = glyph.size
     uni_scale = min(max_w / gw, max_h / gh) if (gw and gh) else 1.0
     
     if uni_scale < 1.0:
-        glyph = glyph.resize((max(1, int(gw * uni_scale)), max(1, int(gh * uni_scale))), Image.LANCZOS)
+        gw, gh = max(1, int(gw * uni_scale)), max(1, int(gh * uni_scale))
+        glyph = glyph.resize((gw, gh), Image.LANCZOS)
 
     canvas = Image.new('L', (width, height), 0)
     gx, gy = glyph.size
     
-    # HORIZONTAL: I-center (Width=28 o 32)
     x = (width - gx) // 2
-    
-    # VERTICAL: I-align sa baseline (hindi sa gitna)
-    # Ilagay sa 2 pixels mula sa ilalim para lahat sila ay pantay ang "paa"
     y = height - gy - 2 
     
     canvas.paste(glyph, (x, y))
-    return canvas.point(lambda p: 1 if p >= (threshold if threshold > 0 else 128) else 0)
+
+    val_threshold = threshold if threshold > 0 else 128
+    bin_mask = canvas.point(lambda p: 255 if p >= val_threshold else 0)
+    
+    for _ in range(max(0, int(shrink_border))):
+        bin_mask = bin_mask.filter(ImageFilter.MinFilter(3))
+
+    return bin_mask.point(lambda p: 1 if p else 0)
 
 def pack_bitmap(mask, width, height):
     rows = []
@@ -74,10 +76,10 @@ def main():
     parser.add_argument('--name', required=True)
     parser.add_argument('--width', type=int, default=14)
     parser.add_argument('--height', type=int, default=20)
-    parser.add_argument('--pad', type=int, default=2)
+    parser.add_argument('--pad', type=int, default=0)
     parser.add_argument('--shrink-border', type=int, default=0)
     parser.add_argument('--vert-scale', type=float, default=1.0)
-    parser.add_argument('--threshold', type=int, default=0)
+    parser.add_argument('--threshold', type=int, default=128)
     parser.add_argument('--use-original-size', action='store_true')
     parser.add_argument('--remove-seams', action='store_true')
     parser.add_argument('--debug', action='store_true')
@@ -96,21 +98,6 @@ def main():
             continue
         if any(x in lower for x in ['percent', '%25', '%', '-p', '_p']) or lower in ['p.png', 'p.bmp']:
             mapping[ord('%')] = os.path.join(args.indir, f)
-
-    if args.use_original_size and mapping:
-        max_gw, max_gh = 0, 0
-        for p in mapping.values():
-            try:
-                im = Image.open(p).convert('RGBA')
-                grayscale = im.convert("L")
-                test_mask = grayscale.point(lambda px: 255 - px)
-                bbox = test_mask.getbbox()
-                if bbox:
-                    w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-                    max_gw, max_gh = max(max_gw, w), max(max_gh, h)
-            except: continue
-        if max_gw > 0:
-            args.width, args.height = max_gw + args.pad*2, max_gh
 
     bytes_per_row = (args.width + 7) // 8
     glyph_bytes = args.height * bytes_per_row

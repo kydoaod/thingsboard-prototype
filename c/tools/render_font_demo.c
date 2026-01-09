@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Siguraduhin na tama ang path ng font file mo
-#include "../lib/Fonts/font14_segoe.c"
+#include "../lib/Fonts/font20_segoe.c"
 
 static void write_bmp(const char *path, int w, int h, unsigned char *rgb) {
     FILE *f = fopen(path, "wb");
@@ -40,8 +40,8 @@ static void write_bmp(const char *path, int w, int h, unsigned char *rgb) {
 int main(int argc, char **argv) {
     const char *text = (argc > 1) ? argv[1] : "25%";
 
-    int gw = Font14_Segoe.Width;  // 28
-    int gh = Font14_Segoe.Height; // 40
+    int gw = Font20_Segoe.Width;  // 28
+    int gh = Font20_Segoe.Height; // 40
     int bpr = (gw + 7) / 8;       // 4 bytes per row
     int glyph_bytes = gh * bpr;   // 160 bytes per char
 
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
         int idx = (int)ch - 32; // ASCII space start
         if (idx < 0) continue;
 
-        const uint8_t *glyph = &Font14_Segoe_Table[idx * glyph_bytes];
+        const uint8_t *glyph = &Font20_Segoe_Table[idx * glyph_bytes];
         int base_x = ci * (gw + spacing);
 
         for (int y = 0; y < gh; ++y) {
