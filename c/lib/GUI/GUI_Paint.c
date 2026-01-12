@@ -788,3 +788,17 @@ void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend)
     LCD_1in54_DisplayWindows(X0, Y0, X1, Y1, Paint.Image);
 }
 */
+void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_t yStart, 
+                                uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key) 
+{
+    for (uint16_t j = 0; j < H_Image; j++) {
+        for (uint16_t i = 0; i < W_Image; i++) {
+            uint16_t Color = image[j * W_Image + i];
+            
+            // Ang Color_Key (0xFFFF para sa white) ay lalaktawan
+            if (Color != Color_Key) {
+                Paint_SetPixel(xStart + i, yStart + j, Color);
+            }
+        }
+    }
+}
