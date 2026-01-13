@@ -802,3 +802,63 @@ void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_
         }
     }
 }
+
+/**
+ * @brief  Custom 8-bit Alpha Blending Draw String
+ * @param  Xstart: Start position X
+ * @param  Ystart: Start position Y
+ * @param  pString: The string to be displayed
+ * @param  Font: The 8-bit font structure
+ * @param  Color_Background: Background color for blending (RGB565)
+ * @param  Color_Foreground: Text color (RGB565, e.g., 0x39C7 for #383838)
+ */
+void Paint_DrawString_Alpha(uint16_t Xstart, uint16_t Ystart, const char * pString, 
+                         sFONT* Font, uint16_t Color_Background, uint16_t Color_Foreground) 
+{
+    uint16_t Xpoint = Xstart;
+    uint16_t Ypoint = Ystart;
+
+    for (; *pString != '\0'; pString++) {
+        int idx = *pString - 32; // ASCII Start
+        if (idx < 0 || idx >= 95) continue;
+
+        // Get the exact proportional width from the widths table
+        uint8_t char_w = Font20_Segoe_Widths[idx];
+        const uint8_t *ptr = &Font->table[idx * Font->Width * Font->Height];
+
+        for (uint16_t j = 0; j < Font->Height; j++) {
+            for (uint16_t i = 0; i < Font->Width; i++) {
+                // Get the 8-bit alpha (0-255)
+                uint8_t alpha = ptr[j * Font->Width + i];
+
+                if (alpha > 0) {
+                    if (alpha == 255) {
+                        Paint_SetPixel(Xpoint + i, Ypoint + j, Color_Foreground);
+                    } else {
+                        // Alpha Blending for RGB565
+                        // Formula: Result = (FG * alpha + BG * (255 - alpha)) / 255
+                        
+                        // Deconstruct the RGB565 channels
+                        uint8_t r_fg = (Color_Foreground >> 11) & 0x1F;
+                        uint8_t g_fg = (Color_Foreground >> 5) & 0x3F;
+                        uint8_t b_fg = (Color_Foreground) & 0x1F;
+
+                        uint8_t r_bg = (Color_Background >> 11) & 0x1F;
+                        uint8_t g_bg = (Color_Background >> 5) & 0x3F;
+                        uint8_t b_bg = (Color_Background) & 0x1F;
+
+                        // Blend each channel
+                        uint8_t r = (r_fg * alpha + r_bg * (255 - alpha)) / 255;
+                        uint8_t g = (g_fg * alpha + g_bg * (255 - alpha)) / 255;
+                        uint8_t b = (b_fg * alpha + b_bg * (255 - alpha)) / 255;
+
+                        uint16_t blended = (r << 11) | (g << 5) | b;
+                        Paint_SetPixel(Xpoint + i, Ypoint + j, blended);
+                    }
+                }
+            }
+        }
+        // Advance X base to proportional width table
+        Xpoint += char_w;
+    }
+}

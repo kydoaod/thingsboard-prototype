@@ -168,7 +168,14 @@ void Paint_DrawTime(UWORD Xstart, UWORD Ystart, PAINT_TIME *pTime, sFONT* Font, 
 //pic
 void Paint_DrawImage(const unsigned char *image,UWORD Startx, UWORD Starty,UWORD Endx, UWORD Endy); 
 void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_t yStart, 
-                                uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key) 
+                                uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key);
+
+//Custom font for intensity display
+//8-bit Alpha Blending Color
+#define GRAY_383838    0x39C7
+void Paint_DrawString_Alpha(uint16_t Xstart, uint16_t Ystart, const char * pString, 
+                         sFONT* Font, uint16_t Color_Background, uint16_t Color_Foreground);
+
 
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif

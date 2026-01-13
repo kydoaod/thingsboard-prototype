@@ -40,8 +40,8 @@
 #define __FONTS_H
 
 /*�������΢���ź�24 (32x41) */
-#define MAX_HEIGHT_FONT         41
-#define MAX_WIDTH_FONT          32
+#define MAX_HEIGHT_FONT         60
+#define MAX_WIDTH_FONT          40
 #define OFFSET_BITMAP           
 
 #ifdef __cplusplus
@@ -79,12 +79,16 @@ typedef struct
   
 }cFONT;
 
+/* Custom 8-bit Alpha Font */
+extern sFONT Font20_Segoe;
+extern const uint8_t Font20_Segoe_Widths[];
+
 extern sFONT Font24;
 extern sFONT Font20;
 extern sFONT Font16;
 extern sFONT Font12;
 extern sFONT Font8;
-extern sFONT Font20_Segoe;
+
 
 extern cFONT Font12CN;
 extern cFONT Font24CN;

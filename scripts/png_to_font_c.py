@@ -1,143 +1,82 @@
-import argparse
-import os
-import re
-import textwrap
-from PIL import Image, ImageFilter
+import argparse, os, re, textwrap
+from PIL import Image, ImageOps
 
-def load_glyph(path, width, height, pad=0, shrink_border=0, vert_scale=1.0, threshold=0):
-    img = Image.open(path).convert("RGBA")
-    alpha = img.split()[-1]
+def get_scaled_8bit_glyph(path, scale_factor):
+    img = Image.open(path).convert("L")
+    w, h = img.size
     
-    if alpha.getextrema() == (255, 255):
-        alpha = img.convert("L").point(lambda p: 255 - p)
-
-    bbox = alpha.getbbox()
-    glyph = alpha.crop(bbox) if bbox else alpha
+    # 1. Pag-calculate ng bagong sukat
+    new_w = int(w * scale_factor)
+    new_h = int(h * scale_factor)
     
-    max_w, max_h = width - (pad * 2), height - 4
-    gw, gh = glyph.size
-    uni_scale = min(max_w / gw, max_h / gh) if (gw and gh) else 1.0
+    # 2. Resizing: Ginagamit ang LANCZOS para manatiling makinis
+    if scale_factor != 1.0:
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
     
-    if uni_scale < 1.0:
-        gw, gh = max(1, int(gw * uni_scale)), max(1, int(gh * uni_scale))
-        glyph = glyph.resize((gw, gh), Image.LANCZOS)
-
-    canvas = Image.new('L', (width, height), 0)
-    gx, gy = glyph.size
+    img = ImageOps.invert(img)
     
-    x = (width - gx) // 2
-    y = height - gy - 2 
+    # 3. Contrast Boost para sa "buhay" na kulay
+    img = img.point(lambda p: min(255, int(p * 1.6)) if p > 5 else 0)
     
-    canvas.paste(glyph, (x, y))
-
-    val_threshold = threshold if threshold > 0 else 128
-    bin_mask = canvas.point(lambda p: 255 if p >= val_threshold else 0)
+    bbox = img.getbbox()
+    if not bbox:
+        return [0]*(new_w * new_h), int(new_w * 0.4), new_w, new_h
     
-    for _ in range(max(0, int(shrink_border))):
-        bin_mask = bin_mask.filter(ImageFilter.MinFilter(3))
-
-    return bin_mask.point(lambda p: 1 if p else 0)
-
-def pack_bitmap(mask, width, height):
-    rows = []
-    bytes_per_row = (width + 7) // 8
-    total_bits = bytes_per_row * 8
-    for y in range(height):
-        row = 0
-        for x in range(width):
-            v = mask.getpixel((x, y))
-            bit_index = (total_bits - 1) - x
-            if bit_index >= 0 and v:
-                row |= (1 << bit_index)
-        row_bytes = []
-        for j in range(bytes_per_row):
-            shift = (bytes_per_row - 1 - j) * 8
-            row_bytes.append((row >> shift) & 0xFF)
-        rows.append(row_bytes)
-    return rows
-
-def fmt_c_array(name, data):
-    lines = [f"const uint8_t {name}_Table[] = {{"]
-    line = "\t"
-    for i, b in enumerate(data):
-        line += f"0x{b:02X}, "
-        if (i+1) % 8 == 0:
-            lines.append(line)
-            line = "\t"
-    if line.strip():
-        lines.append(line)
-    lines.append("};\n")
-    return "\n".join(lines)
+    left, top, right, bottom = bbox
+    advance_width = right + 2 # Breathing room
+    
+    return list(img.getdata()), advance_width, new_w, new_h
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--name', required=True)
-    parser.add_argument('--width', type=int, default=14)
-    parser.add_argument('--height', type=int, default=20)
-    parser.add_argument('--pad', type=int, default=0)
-    parser.add_argument('--shrink-border', type=int, default=0)
-    parser.add_argument('--vert-scale', type=float, default=1.0)
-    parser.add_argument('--threshold', type=int, default=128)
-    parser.add_argument('--use-original-size', action='store_true')
-    parser.add_argument('--remove-seams', action='store_true')
-    parser.add_argument('--debug', action='store_true')
+    # OPTION: Dito mo ilalagay ang scale (default is 1.0)
+    parser.add_argument('--scale', type=float, default=1.0) 
     args = parser.parse_args()
 
-    start, end = 32, 57
-    count = end - start + 1
-    files = os.listdir(args.indir)
+    start, count = 32, 95
     mapping = {}
+    final_w, final_h = 0, 0
 
-    for f in files:
-        lower = f.lower()
-        m = re.search(r"(\d)", lower)
-        if m:
-            mapping[ord(m.group(1))] = os.path.join(args.indir, f)
-            continue
-        if any(x in lower for x in ['percent', '%25', '%', '-p', '_p']) or lower in ['p.png', 'p.bmp']:
-            mapping[ord('%')] = os.path.join(args.indir, f)
+    for f in os.listdir(args.indir):
+        fn, path = f.lower(), os.path.join(args.indir, f)
+        idx = -1
+        if fn == 'p.bmp': idx = ord('%')
+        else:
+            m = re.search(r"^(\d)\.bmp", fn)
+            if m: idx = ord(m.group(1))
+        
+        if idx != -1:
+            data, adv_w, fw, fh = get_scaled_8bit_glyph(path, args.scale)
+            mapping[idx] = (data, adv_w)
+            final_w, final_h = fw, fh
 
-    bytes_per_row = (args.width + 7) // 8
-    glyph_bytes = args.height * bytes_per_row
-    table_bytes = bytearray(count * glyph_bytes)
+    table_data = []
+    width_data = [int(final_w * 0.4)] * count 
+    for i in range(start, start + count):
+        if i in mapping:
+            table_data.extend(mapping[i][0])
+            width_data[i - start] = mapping[i][1]
+        else:
+            table_data.extend([0] * (final_w * final_h))
 
-    for ch_code, path in mapping.items():
-        mask = load_glyph(path, args.width, args.height, pad=args.pad,
-                         shrink_border=args.shrink_border, vert_scale=args.vert_scale,
-                         threshold=args.threshold)
-        rows = pack_bitmap(mask, args.width, args.height)
-        base = (ch_code - start) * glyph_bytes
-        i = 0
-        for rb in rows:
-            for b in rb:
-                table_bytes[base + i] = b
-                i += 1
+    hex_rows = [", ".join([f"0x{b:02X}" for b in table_data[j:j+12]]) for j in range(0, len(table_data), 12)]
+    
+    with open(args.out, 'w') as f:
+        f.write(textwrap.dedent(f"""
+            #include "fonts.h"
+            #include <stdint.h>
 
-    if args.remove_seams and mapping:
-        for x in range(args.width):
-            patterns = set()
-            for ch_code in mapping.keys():
-                glyph_idx = ch_code - start
-                col_bits = 0
-                for y in range(args.height):
-                    byte_idx = (glyph_idx * glyph_bytes) + (y * bytes_per_row) + (x // 8)
-                    bit = (table_bytes[byte_idx] >> (7 - (x % 8))) & 1
-                    col_bits = (col_bits << 1) | bit
-                patterns.add(col_bits)
-            if len(patterns) == 1 and list(patterns)[0] != 0:
-                for ch_code in mapping.keys():
-                    for y in range(args.height):
-                        idx = ((ch_code - start) * glyph_bytes) + (y * bytes_per_row) + (x // 8)
-                        table_bytes[idx] &= ~(1 << (7 - (x % 8)))
+            const uint8_t {args.name}_Table[] = {{
+                {",\n\t".join(hex_rows)}
+            }};
 
-    arr = fmt_c_array(args.name, table_bytes)
-    sfont = textwrap.dedent(f"""
-    #include "fonts.h"
-    {arr}
-    sFONT {args.name} = {{ {args.name}_Table, {args.width}, {args.height} }};
-    """)
-    with open(args.out, 'w') as f: f.write(sfont)
+            const uint8_t {args.name}_Widths[] = {{ {", ".join(map(str, width_data))} }};
+
+            sFONT {args.name} = {{ {args.name}_Table, {final_w}, {final_h} }};
+        """))
+    print(f"Success! Generated {final_w}x{final_h} font (Scale: {args.scale})")
 
 if __name__ == '__main__': main()
