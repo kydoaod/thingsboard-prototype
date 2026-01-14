@@ -21,6 +21,12 @@
 #include "../Fonts/fonts.h"
 
 /**
+ * Custom Images for intensity display and battery display
+**/
+#include "../Images/battery_assets.c"   // Battery Assets
+#include "../Images/intensity_assets.c" // Intensity Assets
+
+/**
  * Display orientation
 **/
 #define IMAGE_ROTATE_0            0
@@ -35,6 +41,16 @@
 #define ROTATE_90           90
 #define ROTATE_180          180
 #define ROTATE_270          270
+
+/**
+ * Battery and Intensity image size
+**/
+
+#define BATTERY_W 51
+#define BATTERY_H 32
+#define INTENSITY_W 320
+#define INTENSITY_H 240
+
 
 /**
  * Display Flip
@@ -167,8 +183,7 @@ void Paint_DrawTime(UWORD Xstart, UWORD Ystart, PAINT_TIME *pTime, sFONT* Font, 
 
 //pic
 void Paint_DrawImage(const unsigned char *image,UWORD Startx, UWORD Starty,UWORD Endx, UWORD Endy); 
-void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_t yStart, 
-                                uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key);
+
 
 //Custom font for intensity display
 //8-bit Alpha Blending Color
@@ -176,6 +191,12 @@ void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_
 void Paint_DrawString_Alpha(uint16_t Xstart, uint16_t Ystart, const char * pString, 
                          sFONT* Font, uint16_t Color_Background, uint16_t Color_Foreground);
 
+                         
+//Custom Images for intensity display
+void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_t yStart, 
+                                uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key);
+void Paint_DrawBattery(uint16_t x, uint16_t y, int percentage);
+void Paint_DrawIntensity(uint16_t x, uint16_t y, int level);
 
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif

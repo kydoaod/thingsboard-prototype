@@ -1,85 +1,100 @@
-# Asset Generation & Preview Pipeline
 
-This document outlines the workflow for converting visual assets (Fonts and Intensity Bar) into C-compatible arrays for use with the `GUI_Paint` library on Raspberry Pi LCD hardware.
+---
+
+# Asset Generation & Preview Pipeline (Raspberry Pi LCD)
+
+This document outlines the workflow for converting visual assets into C-compatible arrays for the `GUI_Paint` library.
 
 ## 1. Font Generation (8-bit Alpha Mask)
 
-Unlike standard 1-bit fonts, this pipeline uses **8-bit Alpha Masking** to achieve high-quality, anti-aliased (smooth) text rendering for dynamic values like "25%".
+Used for high-quality, anti-aliased text (e.g., "25%") that blends smoothly with any background.
 
 ### Steps:
 
-1. **Prepare Glyph BMPs:** Place 40x60 px source files (`0.bmp` through `9.bmp` and `p.bmp`) in `c/pic/digits/`.
-2. **Convert to 8-bit C Font:**
-Run the script to extract alpha transparency and calculate proportional widths. Use the `--scale` argument if the 40x60 size needs to be adjusted for the LCD resolution.
+1. **Prepare BMPs:** Place 40x60 px glyphs (`0.bmp` to `9.bmp`, `p.bmp`) in `c/pic/digits/`.
+2. **Convert to 8-bit Font:**
 ```bash
 python3 scripts/png_to_font_c.py --indir c/pic/digits --out c/lib/Fonts/font20_segoe.c --name Font20_Segoe --scale 1.0
 
 ```
 
 
-3. **Update `fonts.h`:** Ensure the font header supports the larger dimensions and the proportional width table:
-```c
-#define MAX_HEIGHT_FONT 60
-#define MAX_WIDTH_FONT  40
+3. **Integration:** * Update `fonts.h` with `extern sFONT Font20_Segoe;` and `extern const uint8_t Font20_Segoe_Widths[];`.
+* **Rendering:** Use `Paint_DrawString_Alpha(x, y, "25%", &Font20_Segoe, WHITE, GRAY_383838);`.
 
-extern sFONT Font20_Segoe;
-extern const uint8_t Font20_Segoe_Widths[]; // Essential for proportional spacing
+
+
+---
+
+## 2. Battery Icon Generation (RGB565)
+
+Used for the 51x32 px battery status indicator with Chroma Key transparency.
+
+### Steps:
+
+1. **Prepare BMPs:** Place `0, 25, 50, 75, 100.bmp` in `c/pic/battery/`.
+2. **Convert to C:** Run the conversion script to ensure a **51x32** array size and force pure white `0xFFFF` for background pixels.
+3. **Hardware Rendering:**
+* Use the helper: `Paint_DrawBattery(x, y, percentage);`.
+* Uses `Paint_DrawImage_Transparent` with `Color_Key = 0xFFFF`.
+
+
+
+---
+
+## 3. Intensity Gauge Generation (High-Fidelity RGB565)
+
+Used for the arc/gauge display (0-10). Utilizes **Floyd-Steinberg Dithering** to preserve gradients and "kinang" on 16-bit hardware.
+
+### Steps:
+
+1. **Prepare BMPs:** Place `0.bmp` through `10.bmp` in `c/pic/intensity/`.
+2. **Determine Dimensions:** Ensure  matches the source (e.g., **320x240**) to prevent slanted images.
+3. **Convert with Dithering:**
+```bash
+python3 scripts/convert_intensity.py
 
 ```
 
 
+*The script applies dithering and precise bit-scaling to maintain vibrancy.*
+4. **Hardware Rendering:**
+* Use the helper: `Paint_DrawIntensity(x, y, level);`.
+* **Safety:** The function includes a clamp (0-10) to prevent Segmentation Faults if an out-of-bounds level is passed.
+
+
 
 ---
 
-## 2. Intensity Bar Generation (RGB565 Color)
+## 4. Local Preview (Blind Coding Pipeline)
 
-Used for the animated arc intensity bar. This utilizes **Chroma Keying** (Pure White `0xFFFF` as transparency).
+Since hardware is remote, use these tools to verify alignment, padding, and color fidelity on PC.
 
-1. **Prepare Sequence BMPs:** Place files (`0.bmp` to `10.bmp`) in `c/pic/intensity/`.
-2. **Convert to C Arrays:** Run `convert_intensity.py`. The script ensures background pixels are exactly `0xFFFF` to prevent artifacts during transparent overlays.
+### Test Intensity Preview:
 
----
-
-## 3. Local Preview (Testing Without Hardware)
-
-Verify asset quality and scaling logic on a PC using the provided render tools.
-
-### Font Preview:
-
-The previewer simulates the LCD's alpha blending using the following formula:
-
+This simulates the LCD's bit-depth and applies **BMP Row Padding** (multiple of 4) to ensure the preview isn't skewed.
 
 ```bash
-# Ensure the C tool dynamically reads Font.Width and Font.Height
-gcc -I c/lib -o preview_font c/tools/render_font_demo.c c/lib/Fonts/font20_segoe.c -lm
-./preview_font "25%"
+gcc -I c/lib -o test_intensity c/tools/render_intensity_demo.c -lm
+./test_intensity 10  # Generates pic/intensity_test_10.bmp
 
 ```
 
 ---
 
-## 4. Hardware Integration (Raspberry Pi)
+## Technical Specifications
 
-**Important:** Do NOT use `Paint_DrawString_EN` for this font, as it only supports 1-bit data. Use the custom alpha blending function below:
+| Asset Type | Format | Transparency | Logic |
+| --- | --- | --- | --- |
+| **Fonts** | 8-bit Alpha | Alpha Blending |  |
+| **Battery** | RGB565 | Chroma Key | If  then Draw |
+| **Intensity** | RGB565 + Dither | Chroma Key | If  then Draw |
 
-```c
-/* Standard Dark Gray color (#383838) converted to RGB565 */
-#define GRAY_383838 0x39C7 
+## Directory Structure
 
-/* Render 8-bit anti-aliased string */
-Paint_DrawString_Alpha(x, y, "25%", &Font20_Segoe, WHITE, GRAY_383838);
+Ensure `GUI_Paint.c` includes assets using relative paths from the `c/lib/GUI/` folder:
 
-/* Render Intensity Bar with Chroma Key transparency */
-Paint_DrawImage_Transparent(Intensity_Frames[level], x, y, 320, 240, 0xFFFF);
-
-```
-
----
-
-## Troubleshooting
-
-* **Distorted/Skewed Text:** This occurs if the Python script and C renderer use mismatched dimensions. Ensure the C code reads `Font.Width` and `Font.Height` from the generated struct instead of using hardcoded values.
-* **Faded/Pale Text:** If the text appears too light, increase the contrast boost in the Python script (e.g., `p * 1.6`) to saturate the alpha channel.
-* **Text Spacing (Too Tight):** If characters overlap or "cannot breathe," adjust the `advance_width` logic in the Python script (e.g., `right + 4`).
+* `#include "../Images/battery_assets.c"`
+* `#include "../Images/intensity_assets.c"`
 
 ---

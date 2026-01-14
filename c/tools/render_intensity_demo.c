@@ -1,50 +1,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
 #include "../lib/Images/intensity_assets.c"
 
-static void write_bmp(const char *path, int w, int h, unsigned char *rgb) {
-    FILE *f = fopen(path, "wb");
-    unsigned int rb = w * 3, pad = (4 - (rb % 4)) % 4;
-    unsigned int fs = 54 + (rb + pad) * h;
-    unsigned char head[54] = { 'B','M', fs, fs>>8, fs>>16, fs>>24, 0,0,0,0, 54,0,0,0, 40,0,0,0, w, w>>8, w>>16, w>>24, h, h>>8, h>>16, h>>24, 1,0, 24,0 };
-    fwrite(head, 1, 54, f);
-    for (int y = h - 1; y >= 0; --y) {
-        for (int x = 0; x < w; ++x) {
-            fwrite(&rgb[(y * w + x) * 3 + 2], 1, 1, f);
-            fwrite(&rgb[(y * w + x) * 3 + 1], 1, 1, f);
-            fwrite(&rgb[(y * w + x) * 3 + 0], 1, 1, f);
+// BMP Writer na may "Bit Expansion" para tama ang kulay sa PC preview
+void save_preview(const char* filename, int w, int h, uint16_t* data) {
+    FILE* f = fopen(filename, "wb");
+    int padding = (4 - ((w * 3) % 4)) % 4;
+    uint32_t file_size = 54 + (w * 3 + padding) * h;
+    unsigned char header[54] = {'B','M', file_size, file_size>>8, file_size>>16, file_size>>24, 0,0,0,0, 54,0,0,0, 40,0,0,0, w,w>>8,w>>16,w>>24, h,h>>8,h>>16,h>>24, 1,0, 24,0};
+    fwrite(header, 1, 54, f);
+    for (int y = h - 1; y >= 0; y--) {
+        for (int x = 0; x < w; x++) {
+            uint16_t p = data[y * w + x];
+            // Ibalik ang 16-bit sa 24-bit para sa PC preview
+            unsigned char r = ((p >> 11) & 0x1F) * 255 / 31;
+            unsigned char g = ((p >> 5) & 0x3F) * 255 / 63;
+            unsigned char b = (p & 0x1F) * 255 / 31;
+            fwrite(&b, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&r, 1, 1, f);
         }
-        for (unsigned int p = 0; p < pad; ++p) fputc(0, f);
+        unsigned char pad[3] = {0,0,0};
+        fwrite(pad, 1, padding, f);
     }
     fclose(f);
 }
 
-int main(int argc, char **argv) {
-    int percent = (argc > 1) ? atoi(argv[1]) : 50;
-    int f_idx = percent / 10;
-    if (f_idx >= Intensity_Frame_Count) f_idx = Intensity_Frame_Count - 1;
+int main(int argc, char *argv[]) {
+    int level = (argc > 1) ? atoi(argv[1]) : 10; 
+
+    // SAFETY CLAMP: Ito ang kulang kaya nag-Segfault!
+    if (level > 10) {
+        printf("Warning: Level %d is too high. Clamping to 10.\n", level);
+        level = 10; 
+    }
+    if (level < 0) level = 0;
 
     int w = 320, h = 240; 
-    unsigned char *rgb = malloc(w * h * 3);
-    
-    // Canvas background: Pure White (255)
-    memset(rgb, 255, w * h * 3); 
+    uint16_t* canvas = malloc(w * h * 2);
+    for(int i=0; i < w*h; i++) canvas[i] = 0xFFFF; // White background
 
-    const uint16_t* data = Intensity_Frames[f_idx];
-
+    // Ngayon, safe na itong tawagin
+    const uint16_t* frame = Intensity_Frames[level]; 
     for (int i = 0; i < w * h; i++) {
-        uint16_t pix = data[i];
-        // Kung hindi 0xFFFF (White), saka lang drowing
-        if (pix != 0xFFFF) {
-            rgb[i*3+0] = (unsigned char)(((pix & 0xF800) >> 11) << 3);
-            rgb[i*3+1] = (unsigned char)(((pix & 0x07E0) >> 5) << 2);
-            rgb[i*3+2] = (unsigned char)((pix & 0x001F) << 3);
-        }
+        if (frame[i] != 0xFFFF) canvas[i] = frame[i]; // Chroma Key
     }
 
-    write_bmp("pic/final_white_test.bmp", w, h, rgb);
-    free(rgb);
+    char out[50]; sprintf(out, "pic/intensity_test_%d.bmp", level);
+    save_preview(out, w, h, canvas);
+    
+    printf("Fixed! Generated %s\n", out);
+    free(canvas);
     return 0;
 }
