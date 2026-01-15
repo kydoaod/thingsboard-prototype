@@ -13,7 +13,12 @@ void save_bmp(const char* filename, int w, int h, uint16_t* data) {
     for (int y = h - 1; y >= 0; y--) {
         for (int x = 0; x < w; x++) {
             uint16_t p = data[y * w + x];
-            // scaling formula para makuha ang saktong 255
+            
+            // --- ETO ANG MAGIC FIX ---
+            // I-unswap ang bytes para sa PC preview lang.
+            // Ang 0xFFFF ay hindi maaapektuhan (FF swapped is still FF).
+            p = (p << 8) | (p >> 8); 
+
             unsigned char b = ((p & 0x1F) * 255) / 31;
             unsigned char g = (((p >> 5) & 0x3F) * 255) / 63;
             unsigned char r = (((p >> 11) & 0x1F) * 255) / 31;
