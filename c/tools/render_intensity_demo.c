@@ -1,13 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 #include "../lib/Images/intensity_assets.c"
 
-/**
- * @brief BMP Writer na may Byte-Unswap para sa PC preview.
- * Ito ay para itama ang kulay sa Linux dahil ang data sa assets.c ay
- * naka-format na para sa Big-Endian LCD hardware.
- */
 void save_preview(const char* filename, int w, int h, uint16_t* data) {
     FILE* f = fopen(filename, "wb");
     int padding = (4 - ((w * 3) % 4)) % 4;
@@ -18,7 +14,7 @@ void save_preview(const char* filename, int w, int h, uint16_t* data) {
     for (int y = h - 1; y >= 0; y--) {
         for (int x = 0; x < w; x++) {
             uint16_t p = data[y * w + x];
-            p = (p << 8) | (p >> 8); 
+            p = (p << 8) | (p >> 8); // UN-SWAP para sa PC
 
             unsigned char b = ((p & 0x1F) * 255) / 31;
             unsigned char g = (((p >> 5) & 0x3F) * 255) / 63;
@@ -32,31 +28,35 @@ void save_preview(const char* filename, int w, int h, uint16_t* data) {
 }
 
 int main(int argc, char *argv[]) {
-    int level = (argc > 1) ? atoi(argv[1]) : 10; 
+    int level = (argc > 1) ? atoi(argv[1]) : 10;
+    char *mode = (argc > 2) ? argv[2] : "normal"; // Default ay normal
 
-    // SAFETY CLAMP: Iwas Segfault
-    if (level > 10) level = 10; 
-    if (level < 0) level = 0;
+    // 1. I-set ang sukat base sa mode
+    int w = 320, h = 240;
+    const uint16_t** current_frames = Intensity_Frames;
 
-    int w = 320, h = 240; 
-    uint16_t* canvas = malloc(w * h * 2);
-    
-    // Simulan sa PURE WHITE background (0xFFFF)
-    for(int i=0; i < w*h; i++) canvas[i] = 0xFFFF; 
-
-    const uint16_t* frame = Intensity_Frames[level]; 
-    for (int i = 0; i < w * h; i++) {
-        // Chroma Key: Laktawan ang puti
-        if (frame[i] != 0xFFFF) {
-            canvas[i] = frame[i]; 
-        }
+    if (strcmp(mode, "right") == 0) {
+        w = 240; h = 320; // Portrait mode para sa Right-facing
+        current_frames = Intensity_Right_Frames;
     }
 
-    char out[50]; 
-    sprintf(out, "pic/intensity_test_%d.bmp", level);
+    if (level > 10) level = 10;
+    if (level < 0) level = 0;
+
+    // 2. Dynamic malloc base sa napiling sukat
+    uint16_t* canvas = malloc(w * h * 2);
+    for(int i=0; i < w*h; i++) canvas[i] = 0xFFFF; // White background
+
+    const uint16_t* frame = current_frames[level]; 
+    for (int i = 0; i < w * h; i++) {
+        if (frame[i] != 0xFFFF) canvas[i] = frame[i]; // Chroma Key
+    }
+
+    char out[100]; 
+    sprintf(out, "pic/intensity_%s_test_%d.bmp", mode, level);
     save_preview(out, w, h, canvas);
     
-    printf("Fixed Color Preview! Generated %s\n", out);
+    printf("Generated %s (%dx%d)\n", out, w, h);
     free(canvas);
     return 0;
 }

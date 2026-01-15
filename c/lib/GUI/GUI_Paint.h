@@ -45,12 +45,17 @@
 /**
  * Battery and Intensity image size
 **/
+#define BATTERY_W       51
+#define BATTERY_H       32
 
-#define BATTERY_W 51
-#define BATTERY_H 32
+#define BATTERY_RIGHT_W 32
+#define BATTERY_RIGHT_H 51
+
 #define INTENSITY_W 320
 #define INTENSITY_H 240
 
+#define INTENSITY_RIGHT_W 240 
+#define INTENSITY_RIGHT_H 320
 
 /**
  * Display Flip
@@ -196,7 +201,9 @@ void Paint_DrawString_Alpha(uint16_t Xstart, uint16_t Ystart, const char * pStri
 void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_t yStart, 
                                 uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key);
 void Paint_DrawBattery(uint16_t x, uint16_t y, int percentage);
+void Paint_DrawBattery_Right(uint16_t x, uint16_t y, int percentage);
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level);
+void Paint_DrawIntensity_Right(uint16_t x, uint16_t y, int level);
 
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif

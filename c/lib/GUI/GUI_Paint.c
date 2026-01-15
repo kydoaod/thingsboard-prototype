@@ -870,9 +870,25 @@ void Paint_DrawBattery(uint16_t x, uint16_t y, int percentage) {
     Paint_DrawImage_Transparent(Battery_Frames[idx], x, y, BATTERY_W, BATTERY_H, WHITE);
 }
 
+void Paint_DrawBattery_Right(uint16_t x, uint16_t y, int percentage) {
+    int idx = (percentage >= 100) ? 4 : (percentage >= 75) ? 3 : 
+              (percentage >= 50) ? 2 : (percentage >= 25) ? 1 : 0;
+
+    Paint_DrawImage_Transparent(Battery_Right_Frames[idx], x, y, 
+                                BATTERY_RIGHT_W, BATTERY_RIGHT_H, WHITE);
+}
+
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level) {
     if (level > 10) level = 10;
     if (level < 0) level = 0;
 
     Paint_DrawImage_Transparent(Intensity_Frames[level], x, y, INTENSITY_W, INTENSITY_H, WHITE);
+}
+
+void Paint_DrawIntensity_Right(uint16_t x, uint16_t y, int level) {
+    if (level > 10) level = 10;
+    if (level < 0) level = 0;
+
+    Paint_DrawImage_Transparent(Intensity_Right_Frames[level], x, y, 
+                                INTENSITY_RIGHT_W, INTENSITY_RIGHT_H, WHITE);
 }
