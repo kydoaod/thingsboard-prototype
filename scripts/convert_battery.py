@@ -3,11 +3,18 @@ from PIL import Image
 
 def bmp_to_rgb565(pixel):
     r, g, b = pixel
-    if r > 200 and g > 200 and b > 200:
+    
+    # HIGIT NA AGRESIBO: Saktong puti lang ang gawing transparent
+    # Para hindi mabutas ang mga "anti-aliased" na gilid ng icon
+    if r == 255 and g == 255 and b == 255:
         return 0xFFFF
+    
+    # 1. Standard calculation
     val = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-    # BYTE SWAP para sa Big-Endian LCD
-    return ((val << 8) & 0xFF00) | ((val >> 8) & 0x00FF)
+    
+    # 2. BYTE SWAP para sa ST7789 LCD
+    swapped = ((val << 8) & 0xFF00) | ((val >> 8) & 0x00FF)
+    return swapped
 
 def process_battery_folder(indir, prefix, w, h):
     files = ['0.bmp', '25.bmp', '50.bmp', '75.bmp', '100.bmp']
