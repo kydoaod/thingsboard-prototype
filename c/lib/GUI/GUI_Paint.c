@@ -36,6 +36,7 @@
 ******************************************************************************/
 #include "GUI_Paint.h"
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h> //memset()
@@ -878,17 +879,83 @@ void Paint_DrawBattery_Right(uint16_t x, uint16_t y, int percentage) {
                                 BATTERY_RIGHT_W, BATTERY_RIGHT_H, WHITE);
 }
 
-void Paint_DrawIntensity(uint16_t x, uint16_t y, int level) {
-    if (level > 10) level = 10;
-    if (level < 0) level = 0;
+void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart) {
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL) {
+        printf("Error: Failed to open %s\n", filename);
+        return;
+    }
 
-    Paint_DrawImage_Transparent(Intensity_Frames[level], x, y, INTENSITY_W, INTENSITY_H, WHITE);
+    unsigned char header[54];
+    if (fread(header, 1, 54, f) != 54) {
+        fclose(f);
+        return;
+    }
+
+    int w = header[18] + (header[19] << 8);
+    int h = header[22] + (header[23] << 8);
+
+    int padding = (4 - ((w * 3) % 4)) % 4;
+
+    unsigned char *row_buffer = (unsigned char *)malloc(w * 3 + padding);
+    if (row_buffer == NULL) {
+        fclose(f);
+        return;
+    }
+
+    for (int y = 0; y < h; y++) {
+        fread(row_buffer, 1, w * 3 + padding, f);
+
+        int lcd_y = yStart + (h - 1 - y);
+
+        for (int x = 0; x < w; x++) {
+            // BMP Pixel format: Blue, Green, Red (BGR)
+            int b = row_buffer[x * 3];
+            int g = row_buffer[x * 3 + 1];
+            int r = row_buffer[x * 3 + 2];
+
+            // A. Transparency Check (White = Skip)
+            if (r == 255 && g == 255 && b == 255) {
+                continue;
+            }
+
+            // B. Convert RGB888 to RGB565
+            uint16_t color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+
+            // C. BYTE SWAP (For ST7789 Big-Endian LCD)
+            color = (color << 8) | (color >> 8);
+
+            // D. Draw Pixel
+            Paint_SetPixel(xStart + x, lcd_y, color);
+        }
+    }
+
+    free(row_buffer);
+    fclose(f);
 }
 
-void Paint_DrawIntensity_Right(uint16_t x, uint16_t y, int level) {
-    if (level > 10) level = 10;
+void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir) {
     if (level < 0) level = 0;
+    if (level > 100) level = 100;
 
-    Paint_DrawImage_Transparent(Intensity_Right_Frames[level], x, y, 
-                                INTENSITY_RIGHT_W, INTENSITY_RIGHT_H, WHITE);
+    char filepath[256]; 
+    
+    sprintf(filepath, "%s/%d.bmp", asset_dir, level);
+
+    Paint_DrawBMP_File(filepath, x, y);
+}
+
+void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *asset_dir) {
+    int file_num = 0;
+    
+    if (percentage >= 100)      file_num = 100;
+    else if (percentage >= 75)  file_num = 75;
+    else if (percentage >= 50)  file_num = 50;
+    else if (percentage >= 25)  file_num = 25;
+    else                        file_num = 0;
+
+    char filepath[256];
+    sprintf(filepath, "%s/%d.bmp", asset_dir, file_num);
+
+    Paint_DrawBMP_File(filepath, x, y);
 }

@@ -1,10 +1,72 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdint.h>
-#include "../lib/Images/intensity_assets.c"
+#include <string.h>
 
-void save_preview(const char* filename, int w, int h, uint16_t* data) {
+// --- MOCK DEFINITIONS (Para hindi na kailangan ng headers) ---
+#define WHITE 0xFFFF
+typedef uint16_t UWORD;
+
+// Ang ating "Virtual Screen" buffer
+UWORD *VirtualScreen;
+int SCREEN_W = 240;
+int SCREEN_H = 320;
+
+// --- MOCK SET PIXEL ---
+// Ito ang papalit sa Paint_SetPixel ng library.
+// Dito natin isusulat ang pixels sa memory buffer natin.
+void Mock_SetPixel(int x, int y, uint16_t color) {
+    if (x < 0 || x >= SCREEN_W || y < 0 || y >= SCREEN_H) return;
+    VirtualScreen[y * SCREEN_W + x] = color;
+}
+
+// --- THE LOADER LOGIC (Kinopya mula sa GUI_Paint.c) ---
+void Load_BMP_To_Buffer(const char *filename, int xStart, int yStart) {
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL) {
+        printf("Error: Failed to open %s\n", filename);
+        return;
+    }
+
+    unsigned char header[54];
+    if (fread(header, 1, 54, f) != 54) { fclose(f); return; }
+
+    int w = header[18] + (header[19] << 8);
+    int h = header[22] + (header[23] << 8);
+    int padding = (4 - ((w * 3) % 4)) % 4;
+
+    unsigned char *row_buffer = (unsigned char *)malloc(w * 3 + padding);
+
+    for (int y = 0; y < h; y++) {
+        fread(row_buffer, 1, w * 3 + padding, f);
+        
+        // Compute Y (Top-Down LCD logic)
+        int lcd_y = yStart + (h - 1 - y);
+
+        for (int x = 0; x < w; x++) {
+            int b = row_buffer[x * 3];
+            int g = row_buffer[x * 3 + 1];
+            int r = row_buffer[x * 3 + 2];
+
+            // Transparency Check
+            if (r == 255 && g == 255 && b == 255) continue;
+
+            // RGB888 to RGB565
+            uint16_t color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+
+            // BYTE SWAP (Simulate ST7789 Hardware)
+            color = (color << 8) | (color >> 8);
+
+            // Draw to Virtual Screen
+            Mock_SetPixel(xStart + x, lcd_y, color);
+        }
+    }
+    free(row_buffer);
+    fclose(f);
+}
+
+// --- PREVIEW SAVER (Pang-PC View) ---
+void save_pc_preview(const char* filename, int w, int h, UWORD* data) {
     FILE* f = fopen(filename, "wb");
     int padding = (4 - ((w * 3) % 4)) % 4;
     uint32_t file_size = 54 + (w * 3 + padding) * h;
@@ -14,7 +76,9 @@ void save_preview(const char* filename, int w, int h, uint16_t* data) {
     for (int y = h - 1; y >= 0; y--) {
         for (int x = 0; x < w; x++) {
             uint16_t p = data[y * w + x];
-            p = (p << 8) | (p >> 8); // UN-SWAP para sa PC
+            
+            // UN-SWAP (Para tama ang kulay sa PC Monitor)
+            p = (p << 8) | (p >> 8); 
 
             unsigned char b = ((p & 0x1F) * 255) / 31;
             unsigned char g = (((p >> 5) & 0x3F) * 255) / 63;
@@ -28,35 +92,31 @@ void save_preview(const char* filename, int w, int h, uint16_t* data) {
 }
 
 int main(int argc, char *argv[]) {
-    int level = (argc > 1) ? atoi(argv[1]) : 10;
-    char *mode = (argc > 2) ? argv[2] : "normal"; // Default ay normal
-
-    // 1. I-set ang sukat base sa mode
-    int w = 320, h = 240;
-    const uint16_t** current_frames = Intensity_Frames;
-
-    if (strcmp(mode, "right") == 0) {
-        w = 240; h = 320; // Portrait mode para sa Right-facing
-        current_frames = Intensity_Right_Frames;
-    }
-
-    if (level > 10) level = 10;
-    if (level < 0) level = 0;
-
-    // 2. Dynamic malloc base sa napiling sukat
-    uint16_t* canvas = malloc(w * h * 2);
-    for(int i=0; i < w*h; i++) canvas[i] = 0xFFFF; // White background
-
-    const uint16_t* frame = current_frames[level]; 
-    for (int i = 0; i < w * h; i++) {
-        if (frame[i] != 0xFFFF) canvas[i] = frame[i]; // Chroma Key
-    }
-
-    char out[100]; 
-    sprintf(out, "pic/intensity_%s_test_%d.bmp", mode, level);
-    save_preview(out, w, h, canvas);
+    int level = (argc > 1) ? atoi(argv[1]) : 50;
     
-    printf("Generated %s (%dx%d)\n", out, w, h);
-    free(canvas);
+    // Config: Portrait Mode
+    SCREEN_W = 240;
+    SCREEN_H = 320;
+    const char* asset_folder = "c/bin/assets/intensity-right";
+
+    // 1. Setup Memory
+    VirtualScreen = (UWORD *)malloc(SCREEN_W * SCREEN_H * 2);
+    // Fill White
+    for(int i=0; i<SCREEN_W*SCREEN_H; i++) VirtualScreen[i] = WHITE;
+
+    // 2. Build Path & Load
+    char filepath[256];
+    sprintf(filepath, "%s/%03d.bmp", asset_folder, level);
+    
+    printf("Loading: %s\n", filepath);
+    Load_BMP_To_Buffer(filepath, 0, 0);
+
+    // 3. Save Result
+    char out[100];
+    sprintf(out, "pic/final_test_%d.bmp", level);
+    save_pc_preview(out, SCREEN_W, SCREEN_H, VirtualScreen);
+
+    printf("Done! Saved to %s\n", out);
+    free(VirtualScreen);
     return 0;
 }

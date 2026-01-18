@@ -24,7 +24,7 @@
  * Custom Images for intensity display and battery display
 **/
 #include "../Images/battery_assets.c"   // Battery Assets
-#include "../Images/intensity_assets.c" // Intensity Assets
+//#include "../Images/intensity_assets.c" // Intensity Assets
 
 /**
  * Display orientation
@@ -202,8 +202,11 @@ void Paint_DrawImage_Transparent(const uint16_t *image, uint16_t xStart, uint16_
                                 uint16_t W_Image, uint16_t H_Image, uint16_t Color_Key);
 void Paint_DrawBattery(uint16_t x, uint16_t y, int percentage);
 void Paint_DrawBattery_Right(uint16_t x, uint16_t y, int percentage);
-void Paint_DrawIntensity(uint16_t x, uint16_t y, int level);
-void Paint_DrawIntensity_Right(uint16_t x, uint16_t y, int level);
+
+//Draw as BMP from file
+void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart);
+void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir);
+void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *asset_dir);
 
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif
