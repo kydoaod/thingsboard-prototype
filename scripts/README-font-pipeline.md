@@ -1,100 +1,126 @@
-
 ---
 
-# Asset Generation & Preview Pipeline (Raspberry Pi LCD)
+# Asset Generation & Preview Pipeline (Hybrid Architecture)
 
-This document outlines the workflow for converting visual assets into C-compatible arrays for the `GUI_Paint` library.
+This document outlines the workflow for managing visual assets, utilizing a **Hybrid Approach** to balance memory usage (RAM) and storage capacity (Disk/SD Card).
 
 ## 1. Font Generation (8-bit Alpha Mask)
 
-Used for high-quality, anti-aliased text (e.g., "25%") that blends smoothly with any background.
+*(Unchanged)* Used for high-quality, anti-aliased text.
 
-### Steps:
+---
 
-1. **Prepare BMPs:** Place 40x60 px glyphs (`0.bmp` to `9.bmp`, `p.bmp`) in `c/pic/digits/`.
-2. **Convert to 8-bit Font:**
+## 2. Battery Icon Generation (Embedded Array)
+
+**Strategy:** Since battery icons are small (~16KB), we compile them directly into the code (`.c` file) for instant rendering without file I/O delays.
+
+### Specifications:
+
+* **Source:** `c/pic/battery-right/` (Portrait Mode)
+* **Format:** RGB565 (Byte-Swapped for ST7789)
+* **Transparency:** Chroma Key (`0xFFFF` / Pure White)
+
+### Workflow:
+
+1. **Prepare BMPs:** Ensure files are named `0.bmp`, `25.bmp`, `50.bmp`, `75.bmp`, `100.bmp` inside `c/pic/battery-right/`.
+2. **Generate C Code:**
+Run the script to convert images into C arrays. This handles resizing to **32x51**, byte-swapping, and transparency masking.
 ```bash
-python3 scripts/png_to_font_c.py --indir c/pic/digits --out c/lib/Fonts/font20_segoe.c --name Font20_Segoe --scale 1.0
+python3 scripts/convert_battery.py
 
 ```
 
 
-3. **Integration:** * Update `fonts.h` with `extern sFONT Font20_Segoe;` and `extern const uint8_t Font20_Segoe_Widths[];`.
-* **Rendering:** Use `Paint_DrawString_Alpha(x, y, "25%", &Font20_Segoe, WHITE, GRAY_383838);`.
+*Output:* `c/lib/Images/battery_assets.c`
+3. **Hardware Rendering (C Code):**
+Use the function that accesses the pre-loaded arrays in RAM.
+```c
+// Draws the battery based on percentage (0-100)
+Paint_DrawBattery_Right(x, y, percentage);
+
+```
 
 
 
 ---
 
-## 2. Battery Icon Generation (RGB565)
+## 3. Intensity Gauge Generation (File Loader / Load-on-Demand)
 
-Used for the 51x32 px battery status indicator with Chroma Key transparency.
+**Strategy:** Since the animation has 100+ frames (~12MB+), we **CANNOT** embed this in code. Instead, we use a Python "Sanitizer" to clean the images, and the C program reads them directly from the storage folder on demand.
 
-### Steps:
+### Specifications:
 
-1. **Prepare BMPs:** Place `0, 25, 50, 75, 100.bmp` in `c/pic/battery/`.
-2. **Convert to C:** Run the conversion script to ensure a **51x32** array size and force pure white `0xFFFF` for background pixels.
-3. **Hardware Rendering:**
-* Use the helper: `Paint_DrawBattery(x, y, percentage);`.
-* Uses `Paint_DrawImage_Transparent` with `Color_Key = 0xFFFF`.
+* **Source:** `c/pic/intensity-right/`
+* **Target:** `c/bin/assets/intensity-right/`
+* **Format:** Standard 24-bit BMP (The C loader handles RGB565 conversion & byte-swapping during runtime).
 
+### Workflow:
 
-
----
-
-## 3. Intensity Gauge Generation (High-Fidelity RGB565)
-
-Used for the arc/gauge display (0-10). Utilizes **Floyd-Steinberg Dithering** to preserve gradients and "kinang" on 16-bit hardware.
-
-### Steps:
-
-1. **Prepare BMPs:** Place `0.bmp` through `10.bmp` in `c/pic/intensity/`.
-2. **Determine Dimensions:** Ensure  matches the source (e.g., **320x240**) to prevent slanted images.
-3. **Convert with Dithering:**
+1. **Prepare BMPs:** Place raw exports (e.g., `040.bmp`) in `c/pic/intensity-right/`.
+2. **Sanitize & Optimize:**
+Run the "Sanitizer" script. This forces 24-bit format, resizes to **240x320**, removes headers, and renames files to match the `%d.bmp` format.
 ```bash
 python3 scripts/convert_intensity.py
 
 ```
 
 
-*The script applies dithering and precise bit-scaling to maintain vibrancy.*
-4. **Hardware Rendering:**
-* Use the helper: `Paint_DrawIntensity(x, y, level);`.
-* **Safety:** The function includes a clamp (0-10) to prevent Segmentation Faults if an out-of-bounds level is passed.
+*Output:* A folder full of clean `.bmp` files in `c/bin/assets/intensity-right/`.
+3. **Hardware Rendering (C Code):**
+Use the generic loader wrapper. You must specify the folder path.
+```c
+// Loads '50.bmp' from the specified folder and draws it
+Paint_DrawIntensity(0, 0, 50, "c/bin/assets/intensity-right");
+
+```
 
 
 
 ---
 
-## 4. Local Preview (Blind Coding Pipeline)
+## 4. Local Preview (Simulator Tools)
 
-Since hardware is remote, use these tools to verify alignment, padding, and color fidelity on PC.
+Use these standalone tools to verify if the assets are loading correctly and if colors are correct (Green/Gray, not Magenta) on a Linux PC.
 
-### Test Intensity Preview:
+### A. Test Intensity (File Loading)
 
-This simulates the LCD's bit-depth and applies **BMP Row Padding** (multiple of 4) to ensure the preview isn't skewed.
+Verifies if the C code can find, read, and byte-swap the external BMP files.
 
 ```bash
-gcc -I c/lib -o test_intensity c/tools/render_intensity_demo.c -lm
-./test_intensity 10  # Generates pic/intensity_test_10.bmp
+# Compile
+gcc -o render_intensity c/tools/render_intensity_demo.c
+
+# Run (Loads Frame 50 from c/bin/assets/intensity-right)
+./render_intensity 50
+
+```
+
+### B. Test Battery (Array & File)
+
+Verifies the embedded arrays.
+
+```bash
+# Compile
+gcc -o render_battery c/tools/render_battery_demo.c
+
+# Run (Loads 75% icon from battery_assets.c)
+./render_battery 75 array
 
 ```
 
 ---
 
-## Technical Specifications
+## Technical Specifications Summary
 
-| Asset Type | Format | Transparency | Logic |
-| --- | --- | --- | --- |
-| **Fonts** | 8-bit Alpha | Alpha Blending |  |
-| **Battery** | RGB565 | Chroma Key | If  then Draw |
-| **Intensity** | RGB565 + Dither | Chroma Key | If  then Draw |
+| Asset Type | Storage Location | Loading Method | Format on Disk/Code | Logic |
+| --- | --- | --- | --- | --- |
+| **Fonts** | Code (`.c`) | RAM | 8-bit Alpha Map | Alpha Blending |
+| **Battery** | Code (`.c`) | RAM | **RGB565 (Swapped)** | `if (pixel != 0xFFFF) Draw` |
+| **Intensity** | Folder (`/assets`) | **File Stream (`fopen`)** | **24-bit BMP** | Runtime Convert -> Swap -> Draw |
 
-## Directory Structure
+## Directory Structure & Includes
 
-Ensure `GUI_Paint.c` includes assets using relative paths from the `c/lib/GUI/` folder:
+The `GUI_Paint.c` file manages the hybrid includes:
 
-* `#include "../Images/battery_assets.c"`
-* `#include "../Images/intensity_assets.c"`
-
----
+* **Battery:** `#include "../Images/battery_assets.c"` (Must be included to access arrays).
+* **Intensity:** **NO INCLUDE**. Accessed via file path strings.
