@@ -208,6 +208,10 @@ void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart);
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir);
 void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *asset_dir);
 
+//Draw as RAW from file RGB565 format
+void Paint_DrawRaw_File(const char *filename, uint16_t xStart, uint16_t yStart, uint16_t w, uint16_t h);
+void Draw_Intensity_Bin(int level);
+
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif
 

@@ -923,7 +923,7 @@ void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart) 
             uint16_t color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 
             // C. BYTE SWAP (For ST7789 Big-Endian LCD)
-            color = (color << 8) | (color >> 8);
+            //color = (color << 8) | (color >> 8);
 
             // D. Draw Pixel
             Paint_SetPixel(xStart + x, lcd_y, color);
@@ -958,4 +958,33 @@ void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *
     sprintf(filepath, "%s/%d.bmp", asset_dir, file_num);
 
     Paint_DrawBMP_File(filepath, x, y);
+}
+
+
+void Paint_DrawRaw_File(const char *filename, uint16_t xStart, uint16_t yStart, uint16_t w, uint16_t h) {
+    FILE *f = fopen(filename, "rb");
+    if (f == NULL) {
+        printf("Error: Cannot open %s\n", filename);
+        return;
+    }
+
+    uint16_t *row_buffer = (uint16_t *)malloc(w * 2);
+    
+    for (int y = 0; y < h; y++) {
+        fread(row_buffer, 1, w * 2, f);
+        
+        int lcd_y = yStart + y;
+        for (int x = 0; x < w; x++) {
+            Paint_SetPixel(xStart + x, lcd_y, row_buffer[x]);
+        }
+    }
+
+    free(row_buffer);
+    fclose(f);
+}
+
+void Draw_Intensity_Bin(int level) {
+    char filepath[256];
+    sprintf(filepath, "c/bin/assets/intensity-bin/%03d.bin", level); //Change path as needed
+    Paint_DrawRaw_File(filepath, 0, 0, 240, 320);
 }

@@ -1,31 +1,42 @@
 import os
-import shutil
+import struct
 from PIL import Image
 
-def process_intensity_right():
-    indir = 'c/pic/intensity-right'
-    outdir = 'c/bin/assets/intensity-right'
-    w, h = 240, 320
+def convert_to_rgb565_bin(indir, outdir):
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
 
-    if os.path.exists(outdir):
-        shutil.rmtree(outdir)
-    os.makedirs(outdir)
+    print(f"Converting images in {indir} to RGB565 .bin...")
 
     files = [f for f in os.listdir(indir) if f.endswith('.bmp')]
-
+    
     for filename in sorted(files):
-        path = os.path.join(indir, filename)
+        img_path = os.path.join(indir, filename)
+        img = Image.open(img_path).convert('RGB')
         
-        img = Image.open(path)
-        img = img.convert('RGB').resize((w, h), Image.LANCZOS)
+        # Resize if needed (Optional, pero good practice)
+        # img = img.resize((240, 320)) 
+
+        width, height = img.size
+        pixels = list(img.getdata())
         
-        numeric_part = ''.join(filter(str.isdigit, filename))
+        bin_path = os.path.join(outdir, filename.replace('.bmp', '.bin'))
         
-        if numeric_part:
-            out_name = f"{numeric_part}.bmp"
-            out_path = os.path.join(outdir, out_name)
-            img.save(out_path)
-            print(f"Saved: {out_path}")
+        with open(bin_path, 'wb') as f:
+            for r, g, b in pixels:
+                # 1. Convert RGB888 to RGB565
+                rgb565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+                
+                # 2. BYTE SWAP (Big Endian for SPI LCD)
+                # Ito ang magic! Dito natin aayusin para hindi maging rainbow.
+                swapped = ((rgb565 & 0xFF) << 8) | ((rgb565 >> 8) & 0xFF)
+                
+                # Write 2 bytes
+                f.write(struct.pack('>H', swapped)) 
+                
+        print(f"  - Saved {bin_path}")
 
 if __name__ == "__main__":
-    process_intensity_right()
+    # INPUT: Folder ng Intensity BMPs mo
+    # OUTPUT: Folder sa SD Card assets
+    convert_to_rgb565_bin('c/pic/intensity-right', 'c/bin/assets/intensity-bin')
