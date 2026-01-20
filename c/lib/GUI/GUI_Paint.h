@@ -212,6 +212,9 @@ void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *
 void Paint_DrawRaw_File(const char *filename, uint16_t xStart, uint16_t yStart, uint16_t w, uint16_t h);
 void Draw_Intensity_Bin(int level);
 
+//For drawing frame assets. Might expand later.
+void Paint_DrawImage_Asset(UWORD xStart, UWORD yStart, UWORD W_Image, UWORD H_Image, const uint16_t *image);
+
 //void GUI_Partial_Refresh(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend);
 #endif
 

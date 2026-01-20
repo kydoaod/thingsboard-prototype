@@ -83,6 +83,9 @@ typedef struct
 extern sFONT Font20_Segoe;
 extern const uint8_t Font20_Segoe_Widths[];
 
+extern sFONT Font11_Segoe; 
+extern const uint8_t Font11_Segoe_Widths[];
+
 extern sFONT Font24;
 extern sFONT Font20;
 extern sFONT Font16;

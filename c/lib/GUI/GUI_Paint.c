@@ -988,3 +988,24 @@ void Draw_Intensity_Bin(int level) {
     sprintf(filepath, "c/bin/assets/intensity-bin/%03d.bin", level); //Change path as needed
     Paint_DrawRaw_File(filepath, 0, 0, 240, 320);
 }
+
+void Paint_DrawImage_Asset(UWORD xStart, UWORD yStart, UWORD W_Image, UWORD H_Image, const uint16_t *image) 
+{
+    int i, j;
+    for(j = 0; j < H_Image; j++) {
+        for(i = 0; i < W_Image; i++) {
+            // 1. Safety Check (Para hindi lumagpas sa memory)
+            if(xStart + i < Paint.WidthMemory && yStart + j < Paint.HeightMemory) {
+                
+                // 2. Kunin ang kulay direkta (16-bit na 'to, no shifting needed)
+                uint16_t color = image[j * W_Image + i];
+
+                // 3. TRANSPARENCY CHECK (Ito ang wala sa luma)
+                // Kung hindi Puti (0xFFFF), i-draw. Kung Puti, skip (transparent).
+                if(color != 0xFFFF) {
+                    Paint_SetPixel(xStart + i, yStart + j, color);
+                }
+            }
+        }
+    }
+}
