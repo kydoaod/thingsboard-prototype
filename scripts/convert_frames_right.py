@@ -8,15 +8,10 @@ INDIR = 'c/pic/frame-green-right'
 OUT_FILE = 'c/lib/Images/frame_assets_right.c'
 TARGETS = ['frame-solid.bmp', 'frame-hollow.bmp']
 
-# IMPORTANT: Dahil tinanggal ni Mars ang swap sa C code,
-# kailangan nating gawin ang swap DITO.
-# True = Pre-swap bytes (Big Endian) -> Para sa code na WALANG swap.
-# False = Raw bytes (Little Endian) -> Para sa code na MERONG swap.
 SWAP_BYTES = True 
 
 def process_frames():
-    print(f"Generating {OUT_FILE}...")
-    print(f"Byte Swap Mode: {'ENABLED' if SWAP_BYTES else 'DISABLED'}")
+    print(f"Generating CLEANED assets to {OUT_FILE}...")
     
     with open(OUT_FILE, 'w') as f:
         f.write('#include <stdint.h>\n\n')
@@ -39,15 +34,20 @@ def process_frames():
             
             data = []
             for r, g, b in pixels:
+                # --- THE FIX: FORCE CLEAN WHITE ---
+                # Kung ang pixel ay halos puti na (lampas 230 ang brightness), 
+                # pilitin nating maging Pure White (255, 255, 255)
+                # Ito ang magti-trigger ng transparency sa C code.
+                if r > 230 and g > 230 and b > 230:
+                    r, g, b = 255, 255, 255
+
                 # 1. Convert RGB888 to RGB565
                 color = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
                 
                 # 2. OPTIONAL SWAP based on setting
                 if SWAP_BYTES:
-                    # Big Endian (Para kay Mars na walang swap sa C)
                     final_val = ((color & 0xFF) << 8) | ((color >> 8) & 0xFF)
                 else:
-                    # Little Endian (Standard)
                     final_val = color
                     
                 data.append(f"0x{final_val:04X}")
@@ -58,7 +58,7 @@ def process_frames():
             f.write(f"const int {var_name}_W = {w};\n")
             f.write(f"const int {var_name}_H = {h};\n\n")
 
-    print("Done! Safe assets generated.")
+    print("Done! Assets cleaned and generated.")
 
 if __name__ == "__main__":
     process_frames()
