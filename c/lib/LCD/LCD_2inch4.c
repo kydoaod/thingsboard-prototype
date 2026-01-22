@@ -293,3 +293,15 @@ void  Handler_2IN4_LCD(int signo)
     DEV_ModuleExit();
     exit(0);
 }
+
+void LCD_2IN4_FadeOut(UWORD duration_ms) {
+    int delay_step = duration_ms / 100;
+    
+    if (delay_step < 1) delay_step = 1;
+
+    for (int i = 100; i >= 0; i--) {
+        DEV_SetBacklight(i); 
+        DEV_Delay_ms(delay_step);
+    }
+    DEV_SetBacklight(0);
+}

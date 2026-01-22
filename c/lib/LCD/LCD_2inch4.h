@@ -58,6 +58,7 @@ void LCD_2IN4_WriteData_Word(UWORD da);
 void LCD_2IN4_SetCursor(UWORD X, UWORD Y);
 void LCD_2IN4_SetWindow(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD  Yend);
 void LCD_2IN4_ClearWindow(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend,UWORD color);
+void LCD_2IN4_FadeOut(UWORD duration_ms);
 
 
 #endif
