@@ -986,6 +986,17 @@ UBYTE Paint_DrawBMP_Asset(const char *filename, UWORD Xstart, UWORD Ystart)
 }
 
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir) {
+    //OLD CODE
+    /*
+    if (level < 0) level = 0;
+    if (level > 100) level = 100;
+
+    char filepath[256];
+    sprintf(filepath, "%s/%d.bmp", asset_dir, level);
+
+    Paint_DrawBMP_File(filepath, x, y);
+    */
+
     if (level < 0) level = 0;
     if (level > 100) level = 100;
 
