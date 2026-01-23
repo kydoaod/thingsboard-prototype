@@ -205,6 +205,7 @@ void Paint_DrawBattery_Right(uint16_t x, uint16_t y, int percentage);
 
 //Draw as BMP from file
 void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart);
+UBYTE Paint_DrawBMP_Asset(const char *filename, UWORD Xstart, UWORD Ystart);
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir);
 void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *asset_dir);
 

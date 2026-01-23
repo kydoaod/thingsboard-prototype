@@ -934,15 +934,67 @@ void Paint_DrawBMP_File(const char *filename, uint16_t xStart, uint16_t yStart) 
     fclose(f);
 }
 
+UBYTE Paint_DrawBMP_Asset(const char *filename, UWORD Xstart, UWORD Ystart)
+{
+    FILE *fp;
+    uint16_t bmp_type;
+    uint32_t bmp_offset;
+    uint32_t width, height;
+    uint16_t bpp; 
+    uint32_t compression;
+
+    fp = fopen(filename, "rb");
+    if(fp == NULL) return 1; // Error opening
+
+    fread(&bmp_type, 1, 2, fp);
+    if(bmp_type != 0x4D42) { fclose(fp); return 1; } // Not BMP
+
+    fseek(fp, 10, SEEK_SET); fread(&bmp_offset, 1, 4, fp);
+    fseek(fp, 18, SEEK_SET); fread(&width, 1, 4, fp); fread(&height, 1, 4, fp);
+    fseek(fp, 28, SEEK_SET); fread(&bpp, 1, 2, fp);
+    fseek(fp, 30, SEEK_SET); fread(&compression, 1, 4, fp);
+
+    fseek(fp, bmp_offset, SEEK_SET);
+
+    int padding = (4 - ((width * 3) % 4)) % 4;
+    uint8_t *row_buff = (uint8_t *)malloc(width * 3); 
+
+    for (int y = height - 1; y >= 0; y--) {
+        fread(row_buff, 1, width * 3, fp);
+        if (padding > 0) fseek(fp, padding, SEEK_CUR);
+
+        for (int x = 0; x < width; x++) {
+            uint8_t b = row_buff[x * 3];
+            uint8_t g = row_buff[x * 3 + 1];
+            uint8_t r = row_buff[x * 3 + 2];
+
+            // Convert to RGB565
+            uint16_t color = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+
+            // --- SMART TRANSPARENCY CHECK ---
+            
+            if (r > 240 && g > 240 && b > 240) {
+                continue; 
+            }
+            Paint_SetPixel(Xstart + x, Ystart + y, color);
+        }
+    }
+
+    free(row_buff);
+    fclose(fp);
+    return 0;
+}
+
 void Paint_DrawIntensity(uint16_t x, uint16_t y, int level, const char *asset_dir) {
     if (level < 0) level = 0;
     if (level > 100) level = 100;
 
     char filepath[256]; 
-    
-    sprintf(filepath, "%s/%d.bmp", asset_dir, level);
+    // Format: /mnt/SD/assets/intensity-right/050.bmp
+    sprintf(filepath, "%s/%03d.bmp", asset_dir, level); 
 
-    Paint_DrawBMP_File(filepath, x, y);
+    // CALL THE NEW FUNCTION
+    Paint_DrawBMP_Asset(filepath, x, y);
 }
 
 void Paint_DrawBattery_File(uint16_t x, uint16_t y, int percentage, const char *asset_dir) {
