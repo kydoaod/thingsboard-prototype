@@ -1,5 +1,4 @@
 ---
-
 ###  **Raspberry Pi Custom Splash Screen Setup**
 
 **Overview**
@@ -91,6 +90,5 @@ Reboot the system to see the new splash screen.
 sudo reboot
 
 ```
-
 ---
 
