@@ -1,6 +1,6 @@
 ---
 
-### 📄 **Raspberry Pi Custom Splash Screen Setup**
+###  **Raspberry Pi Custom Splash Screen Setup**
 
 **Overview**
 This document outlines the steps to replace the default Raspberry Pi boot screen with a custom logo and enable "Silent Boot" to hide system text for a cleaner, faster-looking startup.
